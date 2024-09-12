@@ -1,0 +1,550 @@
+let libs=['https://cdn.jsdelivr.net/gh/CodingTrain/QuadTree/quadtree.js']
+let json = {};
+let flock = [];
+let p = [];
+let shark = ['S', 'H', 'A', 'R', 'K'];
+var qtree, ptree;
+const capacity = 6;
+var state = 0;
+var f = 0;
+var af = 60
+var population = 50;
+var state = 0;
+let boid_p_slider;
+let boid_a_slider;
+let boid_s_slider;
+let boid_c_slider;
+let boid_f_slider;
+let boid_ds_slider;
+
+let flowField;
+let scl = 10;
+let inc = 0.1;
+let rows, cols;
+var fr;
+
+var zoff = 0;
+
+p5.disableFriendlyErrors = true; // disables FES
+let birds
+let bg, cbg;
+
+function preload() {
+	birds = [loadImage('https://i.ibb.co/GHFPxHH/b1.png'),
+		///loadImage('https://github.com/a-kapahi/codeDrift/blob/main/b5.png'),
+		loadImage('https://i.ibb.co/FJ2Jgmm/b2.png'),
+		//loadImage('https://github.com/a-kapahi/codeDrift/blob/main/b3.png'),
+		loadImage('https://i.ibb.co/vYNPdFY/b4.png')
+	]
+
+
+	bg= [loadImage("https://i.ibb.co/CHRzLVM/bg.jpg"),
+	loadImage("https://i.ibb.co/7KzWwRQ/guillaume-galtier-3-Yrpp-YQPo-CI-unsplash.jpg"),
+	loadImage("https://i.ibb.co/BtDLyDW/uriel-xtg-ONQz-Gg-OE-unsplash.jpg")]
+}
+
+function setup() {
+  canvas = createCanvas(windowWidth, windowHeight);
+  canvas.style("z-index", "-1");
+  background(240);
+	
+  for (var i = 0; i < population; i++) {
+    flock.push(new Boid());
+  }
+  p.push(new Predator());
+	
+	rows = floor(height/scl);
+	cols = floor(width/scl);
+	flowField = new Array(rows*cols);
+
+
+  boid_p_slider = createSlider(0, 500, json.boid_p, 10);
+  boid_s_slider = createSlider(0, 5, json.boid_s, 0.5);
+  boid_a_slider = createSlider(0, 5, json.boid_a, 0.5);
+  boid_c_slider = createSlider(0, 5, json.boid_c, 0.5);
+  boid_f_slider = createSlider(0, 5, json.boid_f, 0.5);
+  boid_ds_slider = createSlider(0, 100, json.boid_ds, 5);
+	
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+function updatePerception() {
+  for (let boid of flock) {
+    boid.perception = boid_p_slider.value();
+    boid.separationForce = boid_s_slider.value();
+    boid.alignmentForce = boid_a_slider.value();
+    boid.cohesionForce = boid_c_slider.value();
+    boid.flightForce = boid_f_slider.value();
+    boid.desiredSeparation = boid_ds_slider.value();
+  }
+
+  json.boid_a = boid_a_slider.value();
+  json.boid_c = boid_c_slider.value();
+  json.boid_s = boid_s_slider.value();
+  json.boid_p = boid_p_slider.value();
+  json.boid_f = boid_f_slider.value();
+  json.boid_ds = boid_ds_slider.value();
+  storeItem("boids_params", json);
+}
+
+function displayDebug() {
+  push();
+  noStroke();
+  fill(10);
+  text("Press any key to exit debug", 0, 10);
+  text("avg. frame rate: " + af, 0, 23);
+  text("boids: " + flock.length, 0, 36);
+  text("boids settings", 0, 60);
+  text("perception radius: " + boid_p_slider.value(), 0, 75);
+  text("alignment force: " + boid_a_slider.value(), 0, 90);
+  text("cohesion force: " + boid_c_slider.value(), 0, 105);
+  text("separation force: " + boid_s_slider.value(), 0, 120);
+  text("flight force: " + boid_f_slider.value(), 0, 135);
+  text("desired separation: " + boid_ds_slider.value(), 0, 150);
+  pop();
+
+  boid_p_slider.show();
+  boid_p_slider.position(120, 60);
+  boid_p_slider.style("width", "80px");
+  boid_p_slider.input(updatePerception);
+
+  boid_a_slider.show();
+  boid_a_slider.position(120, 75);
+  boid_a_slider.style("width", "80px");
+  boid_a_slider.input(updatePerception);
+
+  boid_c_slider.show();
+  boid_c_slider.position(120, 90);
+  boid_c_slider.style("width", "80px");
+  boid_c_slider.input(updatePerception);
+
+  boid_s_slider.show();
+  boid_s_slider.position(120, 105);
+  boid_s_slider.style("width", "80px");
+  boid_s_slider.input(updatePerception);
+
+  boid_f_slider.show();
+  boid_f_slider.position(120, 120);
+  boid_f_slider.style("width", "80px");
+  boid_f_slider.input(updatePerception);
+
+  boid_ds_slider.show();
+  boid_ds_slider.position(120, 135);
+  boid_ds_slider.style("width", "80px");
+  boid_ds_slider.input(updatePerception);
+}
+
+function hideDebug() {
+  boid_p_slider.hide();
+  boid_a_slider.hide();
+  boid_c_slider.hide();
+  boid_s_slider.hide();
+  boid_f_slider.hide();
+  boid_ds_slider.hide();
+}
+
+function keyTyped() {
+  console.log("key: " + key);
+  console.log("state: " + state);
+  switch (key) {
+    case "d": {
+      state = 1;
+      break;
+    }
+    case "b": {
+      if (state == 1) state++;
+      else state = 0;
+      break;
+    }
+    case "u": {
+      if (state == 2) state++;
+      else state = 0;
+      break;
+    }
+    case "g": {
+      if (state == 3) state++;
+      else state = 0;
+      break;
+    }
+    default: {
+      state = 0;
+    }
+  }
+}
+
+function draw() {
+  background(240);
+	image(bg[2],0,0,width,1000)
+  if (state == 4) {
+    let fr = floor(frameRate());
+    f += fr;
+    if (frameCount % 60 == 0) {
+      af = f / 60;
+      f = 0;
+    }
+    displayDebug();
+  } else hideDebug();
+
+  qtree = QuadTree.create();
+  ptree = QuadTree.create();
+	
+	let yoff = 0;
+	for(let y=0; y<rows; y++){
+		let xoff = 0;
+		for(x=0;x<cols;x++){
+			let index = (x + y * cols);
+			let r = noise(xoff, yoff, zoff);
+			let angle = r * TWO_PI * 0.5;
+			let v= p5.Vector.fromAngle(angle);
+			v.setMag(6);
+			flowField[index] = v;
+			xoff += inc;
+			if(state==3){
+				stroke(0,100);
+				strokeWeight(1);
+				push();
+					translate(x*scl, y*scl);
+					rotate(v.heading());
+					line(0,0,scl,0);
+				pop();
+			}
+		}		
+		yoff+=inc;
+	}
+
+  for (let boid of flock) {
+    let point = new Point(boid.position.x, boid.position.y, boid);
+    qtree.insert(point);
+    boid.show();
+  }
+
+  for (let pred of p) {
+    let point = new Point(pred.position.x, pred.position.y, pred);
+    ptree.insert(point);
+    pred.show();
+  }
+
+  for (let boid of flock) {
+    boid.rollEdges();
+    boid.flock(flock, flowField);
+    boid.update();
+  }
+	
+	zoff += 0.009;
+}
+
+function mouseDragged() {
+  if (state != 4) {
+    flock.push(new Boid(mouseX, mouseY));
+    if (flock.length > 200) flock.shift();
+  }
+}
+
+class Predator {
+  constructor(x = random(width), y = random(height)) {
+    this.position = createVector(x, y);
+    this.velocity = createVector(random(-1, 1), random(-1, 1));
+    this.velocity.setMag(random(2, 4));
+    this.acceleration = createVector();
+    this.maxForce = 0.03;
+    this.maxSpeed = 2;
+    this.perception = 200;
+  }
+
+  show() {
+//     push();
+//     strokeWeight(2);
+//     fill(240, 100, 100);
+//     stroke(240, 100, 100);
+//     translate(this.position.x, this.position.y);
+//     rotate(this.velocity.heading());
+//     triangle(0, -6, 0, 6, 8, 0);
+
+//     pop();
+//     this.move();
+//     this.update();
+  }
+
+  chase() {
+    let steering = createVector();
+    let count = 0;
+
+    let range = new Circle(this.position.x, this.position.y, this.perception);
+    let n = qtree.query(range);
+
+    for (let y of n) {
+      let other = y.userData;
+      let d = dist(
+        this.position.x,
+        this.position.y,
+        other.position.x,
+        other.position.y
+      );
+      if (d < this.perception) {
+        steering.add(other.position);
+        count++;
+      }
+    }
+    if (count > 0) {
+      steering.div(count);
+      steering.sub(this.position);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  findpredators() {
+    let n = [];
+    let range = new Circle(
+      this.position.x,
+      this.position.y,
+      this.perception * 2
+    );
+    let q = ptree.query(range);
+    for (let other of q) {
+      n.push(other.userData);
+    }
+    return n;
+  }
+
+  avoid() {
+    let steering = createVector();
+    let preds = this.findpredators();
+    for (let pred of preds) {
+      if (pred === this) continue;
+      let diff = p5.Vector.sub(this.position, pred.position);
+      diff.div(
+        dist(this.position.x, this.position.y, pred.position.x, pred.position.y)
+      );
+      steering.add(diff);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  move() {
+    this.acceleration.set(0, 0);
+    let c = this.chase().mult(1.0);
+    let a = this.avoid().mult(2.0);
+    this.acceleration.add(c);
+    this.acceleration.add(a);
+  }
+
+  update() {
+    this.position.add(this.velocity);
+    this.velocity.add(this.acceleration);
+    this.velocity.limit(this.maxSpeed);
+    this.rollEdges();
+  }
+
+  rollEdges() {
+    if (this.position.x > width) this.position.x = 0;
+    if (this.position.x < 0) this.position.x = width;
+    if (this.position.y > height) this.position.y = 0;
+    if (this.position.y < 0) this.position.y = height;
+  }
+}
+
+class Boid {
+  constructor(x = random(width), y = random(height)) {
+    this.position = createVector(x, y);
+    this.velocity = createVector(random(-1, 1), random(-1, 1));
+    this.velocity.setMag(random(2, 4));
+    this.acceleration = createVector();
+    this.maxForce = 0.05;
+    this.maxSpeed = 3;
+    this.perception = 100;
+    this.desiredSeparation = 35.0;
+    this.separationForce = 1.5;
+    this.alignmentForce = 1;
+    this.cohesionForce = 1;
+		this.img = random(birds);
+    this.flightForce = 5;
+  }
+
+  flock(boids, field) {
+    this.acceleration.set(0, 0);
+    let n = this.findNeighbors(boids);
+    let alignment = this.align(n).mult(this.alignmentForce);
+    let cohesion = this.cohesion(n).mult(this.cohesionForce);
+    let separation = this.separation(n).mult(this.separationForce);
+    let flightResponse = this.flight().mult(this.flightForce);
+    let keepClear = this.clearView(n).mult(0.5);
+		let follow = this.follow(field).mult(0);
+    this.acceleration.add(alignment);
+    this.acceleration.add(cohesion);
+    this.acceleration.add(separation);
+    this.acceleration.add(flightResponse);
+		this.acceleration.add(follow);
+    //this.acceleration.add(keepClear);
+  }
+	
+	follow(vectors){
+    let steering = createVector();
+
+		var x = floor(this.position.x / scl);
+		var y = floor(this.position.y / scl)
+		var index = x+y* cols;
+		var force = vectors[index];
+		
+		steering.add(force);
+    steering.setMag(this.maxSpeed);
+    steering.add(this.velocity);
+    steering.limit(this.maxForce);
+		
+    return steering;
+	}
+
+  rollEdges() {
+    if (this.position.x > width) this.position.x = 0;
+    if (this.position.x < 0) this.position.x = width;
+    if (this.position.y > height) this.position.y = 0;
+    if (this.position.y < 0) this.position.y = height;
+  }
+
+  findNeighbors(boids) {
+    let n = [];
+
+    let range = new Circle(this.position.x, this.position.y, this.perception);
+    let q = qtree.query(range);
+
+    for (let other of q) {
+      if (other.userData != this) {
+        n.push(other.userData);
+      }
+    }
+    return n;
+  }
+
+  findpredators() {
+    let n = [];
+    let range = new Circle(this.position.x, this.position.y, this.perception);
+    let q = ptree.query(range);
+    for (let other of q) {
+      n.push(other.userData);
+    }
+    return n;
+  }
+
+  flight() {
+    let steering = createVector();
+    let preds = this.findpredators();
+    for (let pred of preds) {
+      let diff = p5.Vector.sub(this.position, pred.position); 
+			let distance =  dist(this.position.x, this.position.y, pred.position.x, pred.position.y);
+      diff.div(distance);
+			
+			if(distance<10){ let i = flock.indexOf(this); console.log(i); flock.splice(i,1);}
+
+			
+      steering.add(diff);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  clearView(boids) {
+    let steering = createVector();
+    var inView = 0;
+    for (let other of boids) {
+      var v = p5.Vector.sub(other.position, this.position);
+      if (degrees(v.heading()) < 15 && degrees(v.heading()) > -15) {
+        steering.add(p5.Vector.sub(this.position, other.position));
+        inView++;
+      }
+    }
+    
+    if (inView > 0) {
+      steering.div(inView);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    
+    return steering
+  }
+
+  align(boids) {
+    let steering = createVector();
+    for (let other of boids) {
+      steering.add(other.velocity);
+    }
+    if (boids.length > 0) {
+      steering.div(boids.length);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  cohesion(boids) {
+    let steering = createVector();
+    for (let other of boids) {
+      steering.add(other.position);
+    }
+    if (boids.length > 0) {
+      steering.div(boids.length);
+      steering.sub(this.position);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  separation(boids) {
+    let steering = createVector();
+    var count = 0;
+    for (let other of boids) {
+      let d = dist(
+        this.position.x,
+        this.position.y,
+        other.position.x,
+        other.position.y
+      );
+
+      if (d > 0 && d < this.desiredSeparation) {
+        let diff = p5.Vector.sub(this.position, other.position);
+        diff.div(d);
+        steering.add(diff);
+        count++;
+      }
+    }
+    if (count > 0) {
+      steering.div(count);
+      steering.setMag(this.maxSpeed);
+      steering.sub(this.velocity);
+      steering.limit(this.maxForce);
+    }
+    return steering;
+  }
+
+  update() {
+    this.position.add(this.velocity);
+    this.velocity.add(this.acceleration);
+    this.velocity.limit(this.maxSpeed);
+  }
+
+  show() {
+    push();
+    strokeWeight(2);
+    stroke(25);
+    fill(25);
+    translate(this.position.x, this.position.y);
+    image(this.img,0,0,25,25);
+    //text("FISH", 0, 0);
+    pop();
+  }
+}
+
+
